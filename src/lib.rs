@@ -10,6 +10,7 @@ use proc_macro::{Diagnostic, Level};
 
 #[cfg(doc)]
 use {
+	syn::{parenthesized, braced, bracketed},
 	syn::token::{Paren, Brace, Bracket},
 	syn::punctuated::Punctuated,
 	syn::Attribute,
@@ -19,17 +20,13 @@ use {
 #[proc_macro_derive(Parse, attributes(syn, parse))]
 pub fn derive_parse(item: proc_macro::TokenStream) -> proc_macro::TokenStream {
 	let input = parse_macro_input!(item as DeriveInput);
-	let a = derive_parse_inner(input);
-	println!("{a}");
-	a.into()
+	derive_parse_inner(input).into()
 }
 
 #[proc_macro_derive(ToTokens, attributes(syn, to_tokens))]
 pub fn derive_tokens(item: proc_macro::TokenStream) -> proc_macro::TokenStream {
 	let input = parse_macro_input!(item as DeriveInput);
-	let a = derive_tokens_inner(input);
-	println!("{a}");
-	a.into()
+	derive_tokens_inner(input).into()
 }
 
 macro_rules! q {
@@ -61,17 +58,38 @@ fn derive_parse_inner(input: DeriveInput) -> TokenStream {
 		Data::Enum(data) => {
 			let mut main_body = TokenStream::new();
 			for variant in data.variants {
+				enum Peek {
+					Token(syn::Expr),
+					Func(syn::Expr),
+				}
 				let peek_expr = get_attr(&variant.attrs, "parse")
 					.map(|attr| attr.parse_args_with(|input: ParseStream| {
 						mod kw {
 							syn::custom_keyword!(peek);
+							syn::custom_keyword!(peek_func);
 						}
-						input.parse::<kw::peek>()?;
-						input.parse::<Token![=]>()?;
-						input.parse::<syn::Expr>()
+						if input.peek(kw::peek) {
+							input.parse::<kw::peek>()?;
+							input.parse::<Token![=]>()?;
+							let expr = input.parse::<syn::Expr>()?;
+							if !input.is_empty() {
+								input.parse::<Token![,]>()?;
+							}
+							Ok(Some(Peek::Token(expr)))
+						} else if input.peek(kw::peek_func) {
+							input.parse::<kw::peek_func>()?;
+							input.parse::<Token![=]>()?;
+							let expr = input.parse::<syn::Expr>()?;
+							if !input.is_empty() {
+								input.parse::<Token![,]>()?;
+							}
+							Ok(Some(Peek::Func(expr)))
+						} else {
+							Ok(None)
+						}
 					})).transpose();
 				let peek_expr = match peek_expr {
-					Ok(a) => a,
+					Ok(a) => a.flatten(),
 					Err(e) => {
 						e.span().error(&e.to_string()).emit();
 						None
@@ -80,16 +98,29 @@ fn derive_parse_inner(input: DeriveInput) -> TokenStream {
 
 				let ident = &variant.ident;
 				let body = derive_parse_fields(pq!{ident=> Self::#ident }, &variant.fields);
-				if let Some(expr) = peek_expr {
-					main_body.extend(q!{variant=>
-						let peek: fn(ParseStream) -> bool = #expr;
-						if peek(__input) { return #body; }
-					})
-				} else {
-					main_body.extend(q!{variant=> return #body; })
-				}
+				main_body.extend(match peek_expr {
+					Some(Peek::Token(token)) => {
+						q!{variant=>
+							if __lookahead.peek(#token) { return #body; }
+						}
+					},
+					Some(Peek::Func(func)) => {
+						q!{variant=>
+							let peek: fn(ParseStream) -> bool = #func;
+							if peek(__input) { return #body; }
+						}
+					},
+					None => {
+						q!{variant=> return #body; }
+					},
+				})
 			}
-			pq!{_=> { #main_body } }
+			pq!{_=> {
+				let __lookahead = __input.lookahead1();
+				#main_body
+				#[allow(unreachable_code)]
+				return Err(__lookahead.error())
+			} }
 		},
 		Data::Union(_) => {
 			Span::call_site().error("unions not supported").emit();
