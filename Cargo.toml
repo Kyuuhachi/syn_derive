@@ -2,6 +2,11 @@
 name = "syn_derive"
 version = "0.1.0"
 edition = "2021"
+authors = ["Kyuuhachi <caagr98@gmail.com>"]
+description = "Derive macros for `syn::Parse` and `quote::ToTokens`"
+repository = "https://github.com/Kyuuhachi/syn_derive"
+license = "MIT OR Apache-2.0"
+categories = ["development-tools::procedural-macro-helpers"]
 
 [lib]
 proc-macro = true
