@@ -22,23 +22,23 @@ struct ExampleStruct {
 }
 ```
 
-<code>#[syn([`parenthesized`])]</code>,
-<code>#[syn([`braced`])]</code>,
-<code>#[syn([`bracketed`])]</code>:
+`[syn(parenthesized)]`,
+`[syn(braced)]`,
+`[syn(bracketed)]`:
   Corresponds to the isonymous macros in `syn`.
-  Must be attached to [`struct@Paren`], [`struct@Brace`], and [`struct@Bracket`] fields, respectively.
+  Must be attached to `Paren`, `Brace`, and `Bracket` fields, respectively.
 
-<code>#[syn(in = [`struct@Ident`])]</code>:
+`#[syn(in = Ident)]`:
   The field is read from inside the named delimiter pair.
 
-<code>#[parse(fn([`ParseStream`]) -> [`syn::Result`]\<T>)]</code>:
+`#[parse(fn(ParseStream) -> syn::Result<T>)]`:
   A function used to parse the field,
-  often used with [`Punctuated::parse_terminated`]
-  or [`Attribute::parse_outer`].
+  often used with `Punctuated::parse_terminated`
+  or `Attribute::parse_outer`.
 
-<code>#[to_tokens(fn(&mut [`TokenStream`], &T)]</code>:
+`#[to_tokens(fn(&mut TokenStream, &T)]`:
   A function used to tokenize the field.
-  Often used with [`TokenStreamExt::append_all`],
+  Often used with `TokenStreamExt::append_all`,
   though for type resolution reasons this needs to be indirected through a closure expression.
 
 ## Enums
@@ -58,17 +58,17 @@ enum ExampleEnum {
 }
 ```
 
-<code>#[parse(peek = [`Token`])]</code>:
+`#[parse(peek = Token)]`:
   Checks whether the variant should be parsed.
   Even if multiple peeks succeed, only the first successful variant is attempted.
 
-<code>#[parse(peek_func = fn([`ParseStream`]) -> [`bool`])]</code>:
-  More powerful than `peek` (such as allowing [`peek2`](syn::parse::ParseBuffer::peek2)), but gives worse error messages on failure.
+`#[parse(peek_func = fn(ParseStream) -> bool)]`:
+  More powerful than `peek` (such as allowing `peek2`), but gives worse error messages on failure.
   `peek` should be preferred when possible.
 
 # Alternatives
 - [`derive-syn-parse`](https://docs.rs/derive-syn-parse/latest/)
-  does not handle [`ToTokens`].
+  does not handle `ToTokens`.
   It also seems to encourage throwing tokens away with its `prefix` and `postfix` attributes.
 - [`parsel`](https://docs.rs/derive-syn-parse/latest/)
-  uses its own types for parentheses, meaning the AST types have different API from [`syn`]'s own.
+  uses its own types for parentheses, meaning the AST types have different API from `syn`'s own.
