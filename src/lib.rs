@@ -182,7 +182,7 @@ fn derive_parse_inner(input: DeriveInput) -> TokenStream {
 					},
 					Some(Peek::Func(func)) => {
 						q!{variant=>
-							let peek: fn(ParseStream) -> bool = #func;
+							let peek: fn(::syn::parse::ParseStream) -> bool = #func;
 							if peek(__input) { return #body; }
 						}
 					},
@@ -315,7 +315,7 @@ fn derive_tokens_fields_inner(
 				Ok(expr) => {
 					let ty = &field.ty;
 					q!{expr=> {
-						let __expr: fn(&mut TokenStream, &#ty) = #expr;
+						let __expr: fn(&mut ::proc_macro2::TokenStream, &#ty) = #expr;
 						__expr(tokens, #ident)
 					} }
 				}
