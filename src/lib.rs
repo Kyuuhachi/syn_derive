@@ -61,6 +61,11 @@ enum ExampleEnum {
 }
 ```
 
+<code>#[parse(prefix = fn([`ParseStream`]) -> [`syn::Result`]<_>)]</code>>:
+  A prefix used for all branches, before doing the peeking.
+  Useful when all branches support attributes, for example.
+  The return value is ignored, which gives somewhat suboptimal performance, since the prefix is parsed twice.
+
 <code>#[parse(peek = [`Token`])]</code>:
   Checks whether the variant should be parsed.
   Even if multiple peeks succeed, only the first successful variant is attempted.
@@ -132,6 +137,31 @@ fn derive_parse_inner(input: DeriveInput) -> TokenStream {
 			derive_parse_fields(pq!{_=> Self }, &data.fields)
 		}
 		Data::Enum(data) => {
+			let prefix_expr = get_attr(&input.attrs, "parse")
+				.map(|attr| attr.parse_args_with(|input: ParseStream| {
+					mod kw {
+						syn::custom_keyword!(prefix);
+					}
+					if input.peek(kw::prefix) {
+						input.parse::<kw::prefix>()?;
+						input.parse::<Token![=]>()?;
+						let expr = input.parse::<syn::Expr>()?;
+						if !input.is_empty() {
+							input.parse::<Token![,]>()?;
+						}
+						Ok(Some(expr))
+					} else {
+						Ok(None)
+					}
+				})).transpose();
+			let prefix_expr = match prefix_expr {
+				Ok(a) => a.flatten(),
+				Err(e) => {
+					e.span().error(&e.to_string()).emit();
+					None
+				},
+			};
+
 			let mut main_body = TokenStream::new();
 			for variant in data.variants {
 				enum Peek {
@@ -191,7 +221,14 @@ fn derive_parse_inner(input: DeriveInput) -> TokenStream {
 					},
 				})
 			}
+			let prefix = prefix_expr.map(|func| {
+				q!{func=>
+					let prefix: fn(::syn::parse::ParseStream) -> ::syn::Result<_> = #func;
+					prefix(__input)?;
+				}
+			});
 			pq!{_=> {
+				#prefix
 				let __lookahead = __input.lookahead1();
 				#main_body
 				#[allow(unreachable_code)]
@@ -423,4 +460,3 @@ fn get_attr<'a>(attrs: &'a [syn::Attribute], name: &str) -> Option<&'a syn::Attr
 	}
 	a
 }
-

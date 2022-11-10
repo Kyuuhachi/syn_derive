@@ -58,6 +58,11 @@ enum ExampleEnum {
 }
 ```
 
+`#[parse(prefix = fn(ParseStream) -> syn::Result<_>)]`:
+  A prefix used for all branches, before doing the peeking.
+  Useful when all branches support attributes, for example.
+  The return value is ignored, which gives somewhat suboptimal performance, since the prefix is parsed twice.
+
 `#[parse(peek = Token)]`:
   Checks whether the variant should be parsed.
   Even if multiple peeks succeed, only the first successful variant is attempted.
