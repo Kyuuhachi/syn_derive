@@ -8,20 +8,20 @@ A simple crate for reducing the boilerplate when writing parsers with [`syn`].
 ```rust
 #[derive(Clone, Debug, syn_derive::Parse, syn_derive::ToTokens)]
 struct ExampleStruct {
-	#[parse(Attribute::parse_outer)]
-	#[to_tokens(|tokens, val| tokens.append_all(val))]
-	attrs: Vec<Attribute>,
+    #[parse(Attribute::parse_outer)]
+    #[to_tokens(|tokens, val| tokens.append_all(val))]
+    attrs: Vec<Attribute>,
 
-	path: Path,
+    path: Path,
 
-	#[syn(parenthesized)]
-	paren_token: Paren,
+    #[syn(parenthesized)]
+    paren_token: Paren,
 
-	#[syn(in = brace_token)]
-	#[parse(Punctuated::parse_terminated)]
-	args: Punctuated<Box<Expr>, Token![,]>,
+    #[syn(in = brace_token)]
+    #[parse(Punctuated::parse_terminated)]
+    args: Punctuated<Box<Expr>, Token![,]>,
 
-	semi_token: Token![;],
+    semi_token: Token![;],
 }
 ```
 
@@ -49,15 +49,15 @@ struct ExampleStruct {
 ```rust
 #[derive(Clone, Debug, syn_derive::Parse, syn_derive::ToTokens)]
 enum ExampleEnum {
-	#[parse(peek = Token![struct])]
-	Struct(ItemStruct),
-	#[parse(peek = Token![enum])]
-	Enum(ItemEnum),
+    #[parse(peek = Token![struct])]
+    Struct(ItemStruct),
+    #[parse(peek = Token![enum])]
+    Enum(ItemEnum),
 
-	Other {
-		path: Path,
-		semi_token: Token![;],
-	}
+    Other {
+        path: Path,
+        semi_token: Token![;],
+    }
 }
 ```
 
