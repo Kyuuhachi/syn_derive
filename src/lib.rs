@@ -213,7 +213,7 @@ fn derive_parse_inner(input: DeriveInput) -> TokenStream {
 					Some(Peek::Func(func)) => {
 						q!{variant=>
 							let peek: fn(::syn::parse::ParseStream) -> bool = #func;
-							if peek(__input) { return #body; }
+							if peek(&head.fork()) { return #body; }
 						}
 					},
 					None => {
@@ -221,15 +221,11 @@ fn derive_parse_inner(input: DeriveInput) -> TokenStream {
 					},
 				})
 			}
-			let prefix = prefix_expr.map(|func| {
-				q!{func=>
-					let prefix: fn(::syn::parse::ParseStream) -> ::syn::Result<_> = #func;
-					prefix(__input)?;
-				}
-			});
+			let prefix_expr = prefix_expr.iter();
 			pq!{_=> {
-				#prefix
-				let __lookahead = __input.lookahead1();
+				let head = __input.fork();
+				#( head.call(#prefix_expr)?; )*
+				let __lookahead = head.lookahead1();
 				#main_body
 				#[allow(unreachable_code)]
 				return Err(__lookahead.error())
@@ -246,9 +242,7 @@ fn derive_parse_inner(input: DeriveInput) -> TokenStream {
 	q!{_=>
 		#[automatically_derived]
 		impl #impl_generics ::syn::parse::Parse for #name #ty_generics #where_clause {
-			fn parse(__input: ::syn::parse::ParseStream) -> ::syn::Result<Self> {
-				#body
-			}
+			fn parse(__input: ::syn::parse::ParseStream) -> ::syn::Result<Self> #body
 		}
 	}
 }
