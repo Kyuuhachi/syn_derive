@@ -87,8 +87,7 @@ enum ExampleEnum {
 */
 
 use proc_macro2::{Span, TokenStream};
-use syn::parse::ParseStream;
-use syn::{Token, parse_macro_input, Data, DeriveInput, Ident};
+use syn::{parse_macro_input, Data, DeriveInput, Ident};
 use syn::spanned::Spanned;
 use proc_macro::{Diagnostic, Level};
 
@@ -367,57 +366,24 @@ struct FieldAttr {
 	stream: Option<Ident>,
 }
 
-fn parse_field_attr(attrs: &[syn::Attribute]) -> FieldAttr {
-	mod kw {
-		syn::custom_keyword!(parenthesized);
-		syn::custom_keyword!(braced);
-		syn::custom_keyword!(bracketed);
+fn parse_field_attr(field: &syn::Field) -> FieldAttr {
+	let mut out = FieldAttr::default();
+	for attr in &field.attrs {
+		if attr.path().is_ident("syn") {
+			attr.parse_nested_meta(|meta| {
+				if meta.path.is_ident("in") {
+					out.stream = Some(meta.value()?.parse()?);
+					return Ok(());
+				}
+				if meta.path.is_ident("parenthesized") || meta.path.is_ident("braced") || meta.path.is_ident("bracketed") {
+					out.delimiter = meta.path.get_ident().cloned();
+					return Ok(());
+				}
+				Err(meta.error("unrecognized key"))
+			}).emit();
+		}
 	}
-
-	let result = get_attr(attrs, "syn")
-		.map(|attr| attr.parse_args_with(|input: ParseStream| {
-			let mut attr = FieldAttr::default();
-			loop {
-				if input.is_empty() {
-					break
-				}
-
-				if input.peek(Token![in]) {
-					let in_ = input.parse::<Token![in]>()?;
-					if attr.stream.is_some() {
-						in_.span().error("duplicate `in`").emit();
-					}
-					input.parse::<Token![=]>()?;
-					attr.stream = Some(input.parse()?);
-				} else if input.peek(kw::parenthesized) || input.peek(kw::braced) || input.peek(kw::bracketed) {
-					let w = input.parse::<Ident>()?;
-					if attr.delimiter.is_some() {
-						w.span().error("duplicate delimiter").emit();
-					}
-					attr.delimiter = Some(w);
-				} else {
-					break
-				}
-
-				if !input.is_empty() {
-					input.parse::<Token![,]>()?;
-				}
-			}
-
-			if !input.is_empty() {
-				input.span().error("unexpected token").emit();
-				input.parse::<TokenStream>().unwrap();
-			}
-			Ok(attr)
-		})).transpose();
-
-	match result {
-		Ok(a) => a.unwrap_or_default(),
-		Err(e) => {
-			e.span().error(&e.to_string()).emit();
-			FieldAttr::default()
-		},
-	}
+	out
 }
 
 fn named(
@@ -430,17 +396,7 @@ fn named(
 				|| syn::Member::Unnamed(syn::Index { index: i as u32, span: f.span() }),
 				syn::Member::Named,
 			),
-			parse_field_attr(&f.attrs),
+			parse_field_attr(&f),
 			f,
 		))
-}
-
-fn get_attr<'a>(attrs: &'a [syn::Attribute], name: &str) -> Option<&'a syn::Attribute> {
-	let mut iter = attrs.iter()
-		.filter(|a| a.path().is_ident(name));
-	let a = iter.next();
-	if let Some(b) = iter.next() {
-		b.path().span().error("duplicate attribute").emit();
-	}
-	a
 }
