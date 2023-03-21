@@ -1,6 +1,6 @@
 [package]
 name = "syn_derive"
-version = "0.1.2"
+version = "0.1.3"
 edition = "2021"
 authors = ["Kyuuhachi <caagr98@gmail.com>"]
 description = "Derive macros for `syn::Parse` and `quote::ToTokens`"
