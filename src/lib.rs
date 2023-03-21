@@ -272,26 +272,30 @@ fn derive_parse_fields(path: syn::Path, fields: &syn::Fields) -> TokenStream {
 	for (member, attr, field) in named(fields) {
 		let stream = attr.stream.unwrap_or_else(|| pq!{_=> __input });
 
-		let parse_expr = get_attr(&field.attrs, "parse").map(|attr| match attr.parse_args::<syn::Expr>() {
-			Ok(expr) => {
-				q!{expr=> #stream.call(#expr)? }
+		let mut expr = None;
+		for attr in &field.attrs {
+			if attr.path().is_ident("parse") {
+				expr = attr.parse_args::<syn::Expr>().emit()
+					.map(|e| q!{e=> #stream.call(#e)?});
 			}
-			Err(e) => {
-				e.span().error(&e.to_string()).emit();
-				q!{ e=> panic!() }
-			}
-		});
+		}
 
-		let parse_expr = if let Some(delimiter) = attr.delimiter {
-			if parse_expr.is_some() {
-				delimiter.span().error("cannot do custom parsing on delimiters").emit();
+		let expr = match (expr, attr.delimiter) {
+			(Some(expr), delimiter) => {
+				if delimiter.is_some() {
+					delimiter.span().error("cannot do custom parsing on delimiters").emit();
+				}
+				expr
 			}
-			defs.extend(q!{member=> let #member; });
-			q!{member=> syn::#delimiter!(#member in #stream) }
-		} else {
-			parse_expr.unwrap_or_else(|| q!{member=> #stream.parse()? } )
+			(None, Some(delimiter)) => {
+				defs.extend(q!{member=> let #member; });
+				q!{member=> ::syn::#delimiter!(#member in #stream) }
+			}
+			(None, None) => {
+				q!{member=> #stream.parse()? }
+			}
 		};
-		body.extend(q!{member=> #member: #parse_expr, });
+		body.extend(q!{member=> #member: #expr, });
 	}
 	q!{_=> { #defs ::syn::Result::Ok(#path { #body }) } }
 }
@@ -318,42 +322,42 @@ fn derive_tokens_fields_inner(
 			syn::Member::Named(ident) => {
 				pat.extend(q!{member=> #member, });
 				ident.clone()
-			},
+			}
 			syn::Member::Unnamed(index) => {
 				let i = index.index;
 				let ident = quote::format_ident!("__{i}", span = index.span());
 				pat.extend(q!{member=> #member: #ident, });
 				ident
-			},
-		};
-
-		let tokens_expr = get_attr(&field.attrs, "to_tokens")
-			.map(|attr| match attr.parse_args::<syn::Expr>() {
-				Ok(expr) => {
-					let ty = &field.ty;
-					q!{expr=> {
-						let __expr: fn(&mut ::proc_macro2::TokenStream, &#ty) = #expr;
-						__expr(tokens, #ident)
-					} }
-				}
-				Err(e) => {
-					e.span().error(&e.to_string()).emit();
-					q!{e=> panic!() }
-				}
-			});
-
-		let tokens_expr = if let Some(delimiter) = attr.delimiter {
-			if tokens_expr.is_some() {
-				delimiter.span().error("cannot do custom parsing on delimiters").emit();
 			}
-			let mut body = TokenStream::new();
-			derive_tokens_fields_inner(iter, Some(ident.clone()), pat, &mut body);
-			q!{delimiter=> #ident.surround(tokens, |tokens| { #body }) }
-		} else {
-			tokens_expr.unwrap_or_else(|| q!{member=> #ident.to_tokens(tokens) })
 		};
 
-		body.extend(q!{field=> #tokens_expr; });
+		let mut expr = None;
+		for attr in &field.attrs {
+			if attr.path().is_ident("to_tokens") {
+				expr = attr.parse_args::<syn::Expr>().emit()
+					.map(|e| q!{e=> {
+						let __expr: fn(&mut ::proc_macro2::TokenStream, _) = #e;
+						__expr(tokens, #ident)
+					} });
+			}
+		}
+
+		let expr = match (expr, attr.delimiter) {
+			(Some(expr), delimiter) => {
+				if delimiter.is_some() {
+					delimiter.span().error("cannot do custom parsing on delimiters").emit();
+				}
+				expr
+			}
+			(None, Some(delimiter)) => {
+				let mut body = TokenStream::new();
+				derive_tokens_fields_inner(iter, Some(ident.clone()), pat, &mut body);
+				q!{delimiter=> #ident.surround(tokens, |tokens| { #body }) }
+			}
+			(None, None) => q!{member=> #ident.to_tokens(tokens) },
+		};
+
+		body.extend(q!{field=> #expr; });
 	}
 }
 
