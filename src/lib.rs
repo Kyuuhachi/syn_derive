@@ -165,46 +165,32 @@ fn derive_parse_inner(input: DeriveInput) -> TokenStream {
 
 			let mut main_body = TokenStream::new();
 			for variant in data.variants {
-				enum Peek {
-					Token(syn::Expr),
-					Func(syn::Expr),
-				}
-
-				let mut peek_expr = None::<Peek>;
-				for attr in &input.attrs {
+				let ident = &variant.ident;
+				let body = derive_parse_fields(pq!{ident=> Self::#ident }, &variant.fields);
+				let mut body = q!{variant=> return #body; };
+				for attr in &variant.attrs {
 					if attr.path().is_ident("parse") {
 						attr.parse_nested_meta(|meta| {
 							if meta.path.is_ident("peek") {
-								peek_expr = Some(Peek::Token(meta.value()?.parse::<syn::Expr>()?));
+								let token = meta.value()?.parse::<syn::Expr>()?;
+								body = q!{variant=>
+									if __lookahead.peek(#token) { #body }
+								};
 								return Ok(());
 							}
 							if meta.path.is_ident("peek_func") {
-								peek_expr = Some(Peek::Func(meta.value()?.parse::<syn::Expr>()?));
+								let func = meta.value()?.parse::<syn::Expr>()?;
+								body = q!{variant=>
+									let peek: fn(::syn::parse::ParseStream) -> bool = #func;
+									if peek(&head.fork()) { #body }
+								};
 								return Ok(());
 							}
 							Err(meta.error("unrecognized key"))
 						}).emit();
 					}
 				}
-
-				let ident = &variant.ident;
-				let body = derive_parse_fields(pq!{ident=> Self::#ident }, &variant.fields);
-				main_body.extend(match peek_expr {
-					Some(Peek::Token(token)) => {
-						q!{variant=>
-							if __lookahead.peek(#token) { return #body; }
-						}
-					},
-					Some(Peek::Func(func)) => {
-						q!{variant=>
-							let peek: fn(::syn::parse::ParseStream) -> bool = #func;
-							if peek(&head.fork()) { return #body; }
-						}
-					},
-					None => {
-						q!{variant=> return #body; }
-					},
-				})
+				main_body.extend(body)
 			}
 			let prefix_expr = prefix_expr.iter();
 			q!{_=> {
