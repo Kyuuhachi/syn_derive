@@ -219,16 +219,16 @@ fn derive_parse_inner(input: DeriveInput) -> TokenStream {
 }
 
 fn derive_tokens_inner(input: DeriveInput) -> TokenStream {
-	let body = match input.data {
+	let body = match &input.data {
 		Data::Struct(data) => {
-			let (pat, body) = derive_tokens_fields(pq!{_=> Self }, &data.fields);
+			let (pat, body) = derive_tokens_fields(pq!{_=> Self }, input.span(), &data.fields);
 			q!{_=> let #pat = self; #body }
 		}
 		Data::Enum(data) => {
 			let mut match_body = TokenStream::new();
-			for variant in data.variants {
+			for variant in &data.variants {
 				let ident = &variant.ident;
-				let (pat, body) = derive_tokens_fields(pq!{ident=> Self::#ident }, &variant.fields);
+				let (pat, body) = derive_tokens_fields(pq!{ident=> Self::#ident }, variant.span(), &variant.fields);
 				match_body.extend(q!{variant=> #pat => #body, })
 			}
 			q!{_=> match self { #match_body } }
@@ -283,7 +283,7 @@ fn derive_parse_fields(path: syn::Path, span: Span, fields: &syn::Fields) -> Tok
 	q!{span=> { #defs ::syn::Result::Ok(#path { #body }) } }
 }
 
-fn derive_tokens_fields(path: syn::Path, fields: &syn::Fields) -> (TokenStream, TokenStream) {
+fn derive_tokens_fields(path: syn::Path, span: Span, fields: &syn::Fields) -> (TokenStream, TokenStream) {
 	let mut pat = TokenStream::new();
 	let mut body = TokenStream::new();
 	let mut iter = named(fields).peekable();
@@ -291,7 +291,7 @@ fn derive_tokens_fields(path: syn::Path, fields: &syn::Fields) -> (TokenStream, 
 	if let Some(a) = iter.next() {
 		a.2.span().error("invalid `in`").emit();
 	}
-	(q!{_=> #path { #pat } }, q!{_=> { #body } })
+	(q!{span=> #path { #pat } }, q!{span=> { #body } })
 }
 
 fn derive_tokens_fields_inner(
