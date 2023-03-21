@@ -114,6 +114,26 @@ macro_rules! pq {
 	($a:expr=> $($b:tt)*) => { ::syn::parse_quote_spanned! { ($a).span() => $($b)* } };
 }
 
+trait Emit {
+	type T;
+	fn emit(self) -> Self::T;
+}
+impl Emit for syn::Error {
+	type T = ();
+	fn emit(self) {
+		self.span().error(&self.to_string()).emit();
+	}
+}
+impl<T> Emit for Result<T, syn::Error> {
+	type T = Option<T>;
+	fn emit(self) -> Option<T> {
+		match self {
+			Ok(v) => Some(v),
+			Err(e) => { e.emit(); None }
+		}
+	}
+}
+
 trait SpanError: Spanned {
 	fn warning(&self, text: &str) -> Diagnostic {
 		Diagnostic:: spanned(self.span().unwrap(), Level::Warning, text)
@@ -131,30 +151,18 @@ fn derive_parse_inner(input: DeriveInput) -> TokenStream {
 			derive_parse_fields(pq!{_=> Self }, &data.fields)
 		}
 		Data::Enum(data) => {
-			let prefix_expr = get_attr(&input.attrs, "parse")
-				.map(|attr| attr.parse_args_with(|input: ParseStream| {
-					mod kw {
-						syn::custom_keyword!(prefix);
-					}
-					if input.peek(kw::prefix) {
-						input.parse::<kw::prefix>()?;
-						input.parse::<Token![=]>()?;
-						let expr = input.parse::<syn::Expr>()?;
-						if !input.is_empty() {
-							input.parse::<Token![,]>()?;
+			let mut prefix_expr = None::<syn::Expr>;
+			for attr in &input.attrs {
+				if attr.path().is_ident("parse") {
+					attr.parse_nested_meta(|meta| {
+						if meta.path.is_ident("prefix") {
+							prefix_expr = Some(meta.value()?.parse()?);
+							return Ok(());
 						}
-						Ok(Some(expr))
-					} else {
-						Ok(None)
-					}
-				})).transpose();
-			let prefix_expr = match prefix_expr {
-				Ok(a) => a.flatten(),
-				Err(e) => {
-					e.span().error(&e.to_string()).emit();
-					None
-				},
-			};
+						Err(meta.error("unrecognized key"))
+					}).emit();
+				}
+			}
 
 			let mut main_body = TokenStream::new();
 			for variant in data.variants {
@@ -162,39 +170,23 @@ fn derive_parse_inner(input: DeriveInput) -> TokenStream {
 					Token(syn::Expr),
 					Func(syn::Expr),
 				}
-				let peek_expr = get_attr(&variant.attrs, "parse")
-					.map(|attr| attr.parse_args_with(|input: ParseStream| {
-						mod kw {
-							syn::custom_keyword!(peek);
-							syn::custom_keyword!(peek_func);
-						}
-						if input.peek(kw::peek) {
-							input.parse::<kw::peek>()?;
-							input.parse::<Token![=]>()?;
-							let expr = input.parse::<syn::Expr>()?;
-							if !input.is_empty() {
-								input.parse::<Token![,]>()?;
+
+				let mut peek_expr = None::<Peek>;
+				for attr in &input.attrs {
+					if attr.path().is_ident("parse") {
+						attr.parse_nested_meta(|meta| {
+							if meta.path.is_ident("peek") {
+								peek_expr = Some(Peek::Token(meta.value()?.parse::<syn::Expr>()?));
+								return Ok(());
 							}
-							Ok(Some(Peek::Token(expr)))
-						} else if input.peek(kw::peek_func) {
-							input.parse::<kw::peek_func>()?;
-							input.parse::<Token![=]>()?;
-							let expr = input.parse::<syn::Expr>()?;
-							if !input.is_empty() {
-								input.parse::<Token![,]>()?;
+							if meta.path.is_ident("peek_func") {
+								peek_expr = Some(Peek::Func(meta.value()?.parse::<syn::Expr>()?));
+								return Ok(());
 							}
-							Ok(Some(Peek::Func(expr)))
-						} else {
-							Ok(None)
-						}
-					})).transpose();
-				let peek_expr = match peek_expr {
-					Ok(a) => a.flatten(),
-					Err(e) => {
-						e.span().error(&e.to_string()).emit();
-						None
-					},
-				};
+							Err(meta.error("unrecognized key"))
+						}).emit();
+					}
+				}
 
 				let ident = &variant.ident;
 				let body = derive_parse_fields(pq!{ident=> Self::#ident }, &variant.fields);
