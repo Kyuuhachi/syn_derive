@@ -6,7 +6,9 @@ A simple crate for reducing the boilerplate when writing parsers with [`syn`].
 ## Structs
 
 ```rust
-#[derive(Clone, Debug, syn_derive::Parse, syn_derive::ToTokens)]
+# use syn::{*, token::Paren, punctuated::*};
+# use quote::TokenStreamExt;
+#[derive(syn_derive::Parse, syn_derive::ToTokens)]
 struct ExampleStruct {
     #[parse(Attribute::parse_outer)]
     #[to_tokens(|tokens, val| tokens.append_all(val))]
@@ -17,7 +19,7 @@ struct ExampleStruct {
     #[syn(parenthesized)]
     paren_token: Paren,
 
-    #[syn(in = brace_token)]
+    #[syn(in = paren_token)]
     #[parse(Punctuated::parse_terminated)]
     args: Punctuated<Box<Expr>, Token![,]>,
 
@@ -47,7 +49,8 @@ struct ExampleStruct {
 ## Enums
 
 ```rust
-#[derive(Clone, Debug, syn_derive::Parse, syn_derive::ToTokens)]
+# use syn::{*, token::Paren, punctuated::*};
+#[derive(syn_derive::Parse, syn_derive::ToTokens)]
 enum ExampleEnum {
     #[parse(peek = Token![struct])]
     Struct(ItemStruct),
@@ -88,15 +91,6 @@ use syn::parse::ParseStream;
 use syn::{Token, parse_macro_input, Data, DeriveInput, Ident};
 use syn::spanned::Spanned;
 use proc_macro::{Diagnostic, Level};
-
-#[cfg(doc)]
-use {
-	syn::{parenthesized, braced, bracketed},
-	syn::token::{Paren, Brace, Bracket},
-	syn::punctuated::Punctuated,
-	syn::Attribute,
-	quote::TokenStreamExt,
-};
 
 #[proc_macro_derive(Parse, attributes(syn, parse))]
 pub fn derive_parse(item: proc_macro::TokenStream) -> proc_macro::TokenStream {
@@ -447,10 +441,10 @@ fn named(
 
 fn get_attr<'a>(attrs: &'a [syn::Attribute], name: &str) -> Option<&'a syn::Attribute> {
 	let mut iter = attrs.iter()
-		.filter(|a| a.path.is_ident(name));
+		.filter(|a| a.path().is_ident(name));
 	let a = iter.next();
 	if let Some(b) = iter.next() {
-		b.path.span().error("duplicate attribute").emit();
+		b.path().span().error("duplicate attribute").emit();
 	}
 	a
 }
