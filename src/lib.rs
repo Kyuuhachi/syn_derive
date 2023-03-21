@@ -231,6 +231,7 @@ fn derive_parse_inner(input: DeriveInput) -> TokenStream {
 	let (impl_generics, ty_generics, where_clause) = input.generics.split_for_impl();
 	q!{_=>
 		#[automatically_derived]
+		#[allow(clippy::init_numbered_fields)]
 		impl #impl_generics ::syn::parse::Parse for #name #ty_generics #where_clause {
 			fn parse(__input: ::syn::parse::ParseStream) -> ::syn::Result<Self> #body
 		}
