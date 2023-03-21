@@ -145,9 +145,9 @@ trait SpanError: Spanned {
 impl <T: Spanned> SpanError for T {}
 
 fn derive_parse_inner(input: DeriveInput) -> TokenStream {
-	let body = match input.data {
+	let body = match &input.data {
 		Data::Struct(data) => {
-			derive_parse_fields(pq!{_=> Self }, &data.fields)
+			derive_parse_fields(pq!{_=> Self }, input.span(), &data.fields)
 		}
 		Data::Enum(data) => {
 			let mut prefix_expr = None::<syn::Expr>;
@@ -164,9 +164,9 @@ fn derive_parse_inner(input: DeriveInput) -> TokenStream {
 			}
 
 			let mut main_body = TokenStream::new();
-			for variant in data.variants {
+			for variant in &data.variants {
 				let ident = &variant.ident;
-				let body = derive_parse_fields(pq!{ident=> Self::#ident }, &variant.fields);
+				let body = derive_parse_fields(pq!{ident=> Self::#ident }, variant.span(), &variant.fields);
 				let mut body = q!{variant=> return #body; };
 				for attr in &variant.attrs {
 					if attr.path().is_ident("parse") {
@@ -251,11 +251,11 @@ fn derive_tokens_inner(input: DeriveInput) -> TokenStream {
 	}
 }
 
-fn derive_parse_fields(path: syn::Path, fields: &syn::Fields) -> TokenStream {
+fn derive_parse_fields(path: syn::Path, span: Span, fields: &syn::Fields) -> TokenStream {
 	let mut defs = TokenStream::new();
 	let mut body = TokenStream::new();
 	for (member, fa, field) in named(fields) {
-		let stream = fa.stream.unwrap_or_else(|| pq!{_=> __input });
+		let stream = fa.stream.unwrap_or_else(|| pq!{field.span()=> __input });
 
 		let mut expr = match &fa.delimiter {
 			Some(delimiter) => {
@@ -280,7 +280,7 @@ fn derive_parse_fields(path: syn::Path, fields: &syn::Fields) -> TokenStream {
 
 		body.extend(q!{member=> #member: #expr, });
 	}
-	q!{_=> { #defs ::syn::Result::Ok(#path { #body }) } }
+	q!{span=> { #defs ::syn::Result::Ok(#path { #body }) } }
 }
 
 fn derive_tokens_fields(path: syn::Path, fields: &syn::Fields) -> (TokenStream, TokenStream) {
