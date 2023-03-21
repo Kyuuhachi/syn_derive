@@ -24,24 +24,31 @@ struct ExampleStruct {
     args: Punctuated<Box<Expr>, Token![,]>,
 
     semi_token: Token![;],
+
+    #[parse(Pat::parse_multi, boxed)]
+    pub pat: Box<Pat>,
 }
 ```
 
-<code>#[syn([`parenthesized`])]</code>,
-<code>#[syn([`braced`])]</code>,
-<code>#[syn([`bracketed`])]</code>:
+<code>#[syn(parenthesized)]</code>,
+<code>#[syn(braced)]</code>,
+<code>#[syn(bracketed)]</code>:
   Corresponds to the isonymous macros in `syn`.
   Must be attached to [`struct@Paren`], [`struct@Brace`], and [`struct@Bracket`] fields, respectively.
 
-<code>#[syn(in = [`struct@Ident`])]</code>:
+<code>#[syn(in = Ident)]</code>:
   The field is read from inside the named delimiter pair.
 
-<code>#[parse(fn([`ParseStream`]) -> [`syn::Result`]\<T>)]</code>:
+<code>#[parse(fn(ParseStream) -> syn::Result\<T>)]</code>:
   A function used to parse the field,
   often used with [`Punctuated::parse_terminated`]
   or [`Attribute::parse_outer`].
 
-<code>#[to_tokens(fn(&mut [`TokenStream`], &T)]</code>:
+<code>#[parse(_, boxed)]</code>:
+  Wraps the specified parse function to box the value.
+  Useful with functions like `Pat::parse_multi` above.
+
+<code>#[to_tokens(fn(&mut TokenStream, &T)]</code>:
   A function used to tokenize the field.
   Often used with [`TokenStreamExt::append_all`],
   though for type resolution reasons this needs to be indirected through a closure expression.
@@ -91,6 +98,17 @@ use syn::parse::{ParseStream, Parser};
 use syn::{parse_macro_input, Data, DeriveInput, Ident};
 use syn::spanned::Spanned;
 use proc_macro::{Diagnostic, Level};
+
+#[cfg(doc)]
+use {
+	syn::{
+		Token,
+		Attribute,
+		punctuated::Punctuated,
+		token::{Paren, Bracket, Brace},
+	},
+	quote::TokenStreamExt,
+};
 
 #[proc_macro_derive(Parse, attributes(syn, parse))]
 pub fn derive_parse(item: proc_macro::TokenStream) -> proc_macro::TokenStream {
