@@ -87,6 +87,7 @@ enum ExampleEnum {
 */
 
 use proc_macro2::{Span, TokenStream};
+use syn::parse::{ParseStream, Parser};
 use syn::{parse_macro_input, Data, DeriveInput, Ident};
 use syn::spanned::Spanned;
 use proc_macro::{Diagnostic, Level};
@@ -272,9 +273,26 @@ fn derive_parse_fields(path: syn::Path, span: Span, fields: &syn::Fields) -> Tok
 				if fa.delimiter.is_some() {
 					fa.delimiter.span().error("cannot do custom parsing on delimiters").emit();
 				}
-				if let Some(e) = attr.parse_args::<syn::Expr>().emit() {
+				attr.parse_args_with(|input: ParseStream| {
+					let e = input.parse::<syn::Expr>()?;
 					expr = q!{e=> #stream.call(#e)?};
-				}
+
+					if input.is_empty() {
+						return Ok(());
+					}
+					input.parse::<syn::Token![,]>()?;
+					if input.is_empty() {
+						return Ok(());
+					}
+
+					syn::meta::parser(|meta| {
+						if meta.path.is_ident("boxed") {
+							expr = q!{meta.path.span()=> ::std::boxed::Box::new(#expr)};
+							return Ok(())
+						}
+						Err(meta.error("unrecognized key"))
+					}).parse2(input.parse::<TokenStream>()?)
+				}).emit();
 			}
 		}
 
