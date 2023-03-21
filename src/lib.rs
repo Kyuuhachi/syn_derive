@@ -222,7 +222,7 @@ fn derive_parse_inner(input: DeriveInput) -> TokenStream {
 				})
 			}
 			let prefix_expr = prefix_expr.iter();
-			pq!{_=> {
+			q!{_=> {
 				let head = __input.fork();
 				#( head.call(#prefix_expr)?; )*
 				let __lookahead = head.lookahead1();
@@ -233,7 +233,7 @@ fn derive_parse_inner(input: DeriveInput) -> TokenStream {
 		},
 		Data::Union(_) => {
 			Span::call_site().error("unions not supported").emit();
-			pq!{_=> { } }
+			q!{_=> { } }
 		}
 	};
 
@@ -280,7 +280,7 @@ fn derive_tokens_inner(input: DeriveInput) -> TokenStream {
 	}
 }
 
-fn derive_parse_fields(path: syn::Path, fields: &syn::Fields) -> syn::Block {
+fn derive_parse_fields(path: syn::Path, fields: &syn::Fields) -> TokenStream {
 	let mut defs = TokenStream::new();
 	let mut body = TokenStream::new();
 	for (member, attr, field) in named(fields) {
@@ -307,10 +307,10 @@ fn derive_parse_fields(path: syn::Path, fields: &syn::Fields) -> syn::Block {
 		};
 		body.extend(q!{member=> #member: #parse_expr, });
 	}
-	pq!{_=> { #defs ::syn::Result::Ok(#path { #body }) } }
+	q!{_=> { #defs ::syn::Result::Ok(#path { #body }) } }
 }
 
-fn derive_tokens_fields(path: syn::Path, fields: &syn::Fields) -> (syn::Pat, syn::Block) {
+fn derive_tokens_fields(path: syn::Path, fields: &syn::Fields) -> (TokenStream, TokenStream) {
 	let mut pat = TokenStream::new();
 	let mut body = TokenStream::new();
 	let mut iter = named(fields).peekable();
@@ -318,7 +318,7 @@ fn derive_tokens_fields(path: syn::Path, fields: &syn::Fields) -> (syn::Pat, syn
 	if let Some(a) = iter.next() {
 		a.2.span().error("invalid `in`").emit();
 	}
-	(pq!{_=> #path { #pat } }, pq!{_=> { #body } })
+	(q!{_=> #path { #pat } }, q!{_=> { #body } })
 }
 
 fn derive_tokens_fields_inner(
