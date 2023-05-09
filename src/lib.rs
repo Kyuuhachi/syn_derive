@@ -1,5 +1,3 @@
-#![feature(proc_macro_diagnostic)]
-
 /*!
 A simple crate for reducing the boilerplate when writing parsers with [`syn`].
 
@@ -97,7 +95,7 @@ use proc_macro2::{Span, TokenStream};
 use syn::parse::{ParseStream, Parser};
 use syn::{parse_macro_input, Data, DeriveInput, Ident};
 use syn::spanned::Spanned;
-use proc_macro::{Diagnostic, Level};
+use proc_macro_error::{proc_macro_error, Diagnostic, Level};
 
 #[cfg(doc)]
 use {
@@ -110,12 +108,14 @@ use {
 	quote::TokenStreamExt,
 };
 
+#[proc_macro_error]
 #[proc_macro_derive(Parse, attributes(syn, parse))]
 pub fn derive_parse(item: proc_macro::TokenStream) -> proc_macro::TokenStream {
 	let input = parse_macro_input!(item as DeriveInput);
 	derive_parse_inner(input).into()
 }
 
+#[proc_macro_error]
 #[proc_macro_derive(ToTokens, attributes(syn, to_tokens))]
 pub fn derive_tokens(item: proc_macro::TokenStream) -> proc_macro::TokenStream {
 	let input = parse_macro_input!(item as DeriveInput);
@@ -154,11 +154,11 @@ impl<T> Emit for Result<T, syn::Error> {
 
 trait SpanError: Spanned {
 	fn warning(&self, text: &str) -> Diagnostic {
-		Diagnostic:: spanned(self.span().unwrap(), Level::Warning, text)
+		Diagnostic:: spanned(self.span(), Level::Warning, text.to_owned())
 	}
 
 	fn error(&self, text: &str) -> Diagnostic {
-		Diagnostic:: spanned(self.span().unwrap(), Level::Error, text)
+		Diagnostic:: spanned(self.span(), Level::Error, text.to_owned())
 	}
 }
 impl <T: Spanned> SpanError for T {}
