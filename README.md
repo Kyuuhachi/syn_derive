@@ -1,4 +1,4 @@
-A simple crate for reducing the boilerplate when writing parsers with [`syn`].
+A simple crate for reducing the boilerplate when writing parsers with `syn`.
 
 ## Structs
 
