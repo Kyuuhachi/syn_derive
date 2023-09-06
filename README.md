@@ -75,5 +75,5 @@ enum ExampleEnum {
 - [`derive-syn-parse`](https://docs.rs/derive-syn-parse/latest/)
   does not handle `ToTokens`.
   It also seems to encourage throwing tokens away with its `prefix` and `postfix` attributes.
-- [`parsel`](https://docs.rs/derive-syn-parse/latest/)
+- [`parsel`](https://docs.rs/parsel/latest/)
   uses its own types for parentheses, meaning the AST types have different API from `syn`'s own.
