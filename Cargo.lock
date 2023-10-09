@@ -56,7 +56,7 @@ dependencies = [
 
 [[package]]
 name = "syn_derive"
-version = "0.1.7"
+version = "0.1.8"
 dependencies = [
  "proc-macro-error",
  "proc-macro2",

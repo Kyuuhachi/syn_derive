@@ -71,6 +71,10 @@ enum ExampleEnum {
   More powerful than `peek` (such as allowing `peek2`), but gives worse error messages on failure.
   `peek` should be preferred when possible.
 
+# Feature flags
+- `full`: enables `syn/full`, which is needed to parse complex expressions — such as closures — in attribute values.
+  Without this, you can still use for example paths to functions, but this is much less convenient.
+
 # Alternatives
 - [`derive-syn-parse`](https://docs.rs/derive-syn-parse/latest/)
   does not handle `ToTokens`.
