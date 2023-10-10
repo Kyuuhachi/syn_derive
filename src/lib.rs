@@ -83,7 +83,7 @@ enum ExampleEnum {
   `peek` should be preferred when possible.
 
 # Feature flags
-- `full`: enables `syn/full`, which is needed to parse complex expressions — such as closures — in attribute values.
+- `full` (enabled by default): enables `syn/full`, which is needed to parse complex expressions — such as closures — in attribute values.
   Without this, you can still use for example paths to functions, but this is much less convenient.
 
 # Alternatives
