@@ -99,7 +99,7 @@ use proc_macro2::{Span, TokenStream};
 use syn::parse::{ParseStream, Parser};
 use syn::{parse_macro_input, Data, DeriveInput, Ident};
 use syn::spanned::Spanned;
-use proc_macro_error::{proc_macro_error, Diagnostic, Level};
+use proc_macro_error2::{proc_macro_error, Diagnostic, Level};
 
 #[cfg(doc)]
 use {
