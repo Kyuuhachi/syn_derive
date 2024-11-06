@@ -157,10 +157,6 @@ impl<T> Emit for Result<T, syn::Error> {
 }
 
 trait SpanError: Spanned {
-	fn warning(&self, text: &str) -> Diagnostic {
-		Diagnostic:: spanned(self.span(), Level::Warning, text.to_owned())
-	}
-
 	fn error(&self, text: &str) -> Diagnostic {
 		Diagnostic:: spanned(self.span(), Level::Error, text.to_owned())
 	}
